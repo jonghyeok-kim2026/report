@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>거래처 리포트 · 거래처 모니터링 시스템</title>
+<style>
+  :root { --bg:#f5f6f6; --surface:#ffffff; --border:#e2e5e6; --text:#20262b; --muted:#97a0a6; --accent:#0097a9; --danger:#dc2626; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"Malgun Gothic","Apple SD Gothic Neo",sans-serif; padding:28px 16px; }
+  .box { max-width:520px; margin:12vh auto 0; background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:28px 24px; text-align:center; box-shadow:0 1px 3px rgba(15,23,42,.04); }
+  .title { font-size:15px; font-weight:800; margin-bottom:8px; }
+  .desc { font-size:13px; color:#4f5a62; line-height:1.7; }
+  .spin { width:28px; height:28px; border:3px solid #e3f5f7; border-top-color:var(--accent); border-radius:50%; margin:0 auto 14px; animation:sp 0.9s linear infinite; }
+  @keyframes sp { to { transform: rotate(360deg); } }
+  .err .title { color:var(--danger); }
+  .foot { font-size:11px; color:var(--muted); margin-top:14px; }
+</style>
+</head>
+<body>
+<div class="box" id="box">
+  <div class="spin"></div>
+  <div class="title">거래처 리포트를 불러오는 중입니다</div>
+  <div class="desc">잠시만 기다려 주세요.</div>
+</div>
+<script>
+/* ─────────────────────────────────────────────────────────────
+   거래처 모니터링 시스템 · 메일 리포트 보기 페이지 (GitHub Pages용)
+   - 이 파일에는 거래처 데이터가 들어 있지 않습니다.
+   - 메일 링크의 ?r=경로 로 Supabase(company-reports 공개 버킷)에 올라간
+     리포트를 불러와, 대시보드가 만든 화면 그대로 보여줍니다.
+   - Supabase 프로젝트를 바꾸면 아래 두 값만 고치면 됩니다.
+   ───────────────────────────────────────────────────────────── */
+var SUPABASE_URL = 'https://vhcmgpwexngornqemzfl.supabase.co';
+var REPORT_BUCKET = 'company-reports';
+
+(function () {
+  function fail(title, desc) {
+    var box = document.getElementById('box');
+    box.className = 'box err';
+    box.innerHTML = '<div class="title">' + title + '</div><div class="desc">' + desc + '</div>'
+      + '<div class="foot">거래처 모니터링 시스템 · 문의는 채권관리 담당자에게 해 주세요.</div>';
+  }
+  var r = '';
+  try { r = new URLSearchParams(location.search).get('r') || ''; } catch (e) {}
+  // 대시보드가 만드는 경로 형식만 허용: 연월(6자리)/영문소문자·숫자-영문소문자·숫자.json
+  if (!/^\d{6}\/[a-z0-9]+-[a-z0-9]+\.json$/.test(r)) {
+    fail('링크가 올바르지 않습니다', '메일에 있는 업체명 링크를 다시 눌러 주세요.<br>링크 주소가 잘렸다면 메일에서 주소 전체를 복사해 열어 주세요.');
+    return;
+  }
+  var url = SUPABASE_URL + '/storage/v1/object/public/' + REPORT_BUCKET + '/' + r;
+  fetch(url, { cache: 'no-store' })
+    .then(function (res) {
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return res.json();
+    })
+    .then(function (d) {
+      if (!d || typeof d.html !== 'string' || d.html.indexOf('<html') < 0) throw new Error('형식 오류');
+      document.open();
+      document.write(d.html);
+      document.close();
+    })
+    .catch(function (e) {
+      fail('리포트를 불러오지 못했습니다',
+        '리포트가 삭제되었거나, 저장소가 일시정지된 상태일 수 있습니다.<br>잠시 후 다시 시도하고, 계속 열리지 않으면 발송한 담당자에게 알려 주세요.'
+        + '<br><span style="font-size:11px;color:#97a0a6">(' + String(e && e.message || e) + ')</span>');
+    });
+})();
+</script>
+</body>
+</html>
